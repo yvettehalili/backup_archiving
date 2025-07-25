@@ -14,7 +14,23 @@ databases:
     source_path: 'Backups/Current/MYSQL'
     target_path: 'Backups/Current/MYSQL'
     file_extension: '.sql.gz'
+    servers:
+      - isdba-cloudsql-apps-01
+      - isdba-cloudsql-us-we-a-01
+      - isdba-cloudsql-us-we1-a-07
+      - ti-mysql-us-we-10
+      - ti-mysql-us-we-14
+      - ti-mysql-eu-we-01
+      - ti-mysql-us-we-13
+      - ti-mysql-us-we-12
+      - GDEFRYAK03
+      - SUSWEYAK17
   postgresql:
     source_path: 'Backups/Current/POSTGRESQL'
     target_path: 'Backups/Current/POSTGRESQL'
     file_extension: '.dump'
+    servers:
+      - ti-postgresql-us-we-a-03
+      - isdba-pgsql-chatbot-01
+      - ti-postgresql-eu-we1-b-01
+      - ti-postgresql-us-we-a-02
