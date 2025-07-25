@@ -4,7 +4,7 @@ service_account:
 storage:
   source_bucket: 'ti-dba-prod-sql-01'
   target_bucket: 'ti-dba-prod-sql-02'
-  retention_days: 60
+  retention_days: 303
 
 paths:
   log_dir: '/backup/logs'
