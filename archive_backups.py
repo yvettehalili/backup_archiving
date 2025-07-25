@@ -3,11 +3,12 @@
 import os
 import argparse
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from google.cloud import storage
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import yaml
 from pathlib import Path
+import re
 
 REQUIRED_CONFIG_KEYS = [
     ('paths', 'log_dir'),
@@ -52,22 +53,37 @@ def authenticate(service_account_path: str) -> storage.Client:
     return storage.Client()
 
 def extract_backup_date(filename: str) -> datetime | None:
-    """Extract date from backup filename."""
+    """Extract date from backup filename (searches for YYYY-MM-DD anywhere in the path)."""
+    match = re.search(r'\d{4}-\d{2}-\d{2}', filename)
+    if match:
+        try:
+            return datetime.strptime(match.group(), '%Y-%m-%d')
+        except Exception:
+            return None
+    return None
+
+def extract_server_name(blob_name: str, db_type: str) -> str | None:
+    """
+    Extract server name from blob path.
+    Example: Backups/Current/MYSQL/GDEFRYAK03/2025-05-07_db_kimai.sql.gz
+    Returns: GDEFRYAK03
+    """
+    parts = blob_name.split('/')
     try:
-        date_part = filename.split('_')[0]
-        return datetime.strptime(date_part, '%Y-%m-%d')
-    except Exception:
+        if db_type.lower() in ['mysql', 'postgresql']:
+            return parts[3]  # 0:Backups, 1:Current, 2:DBTYPE, 3:SERVERNAME
+    except IndexError:
         return None
 
 def should_archive(backup_date: datetime | None, threshold_days: int) -> bool:
     """Check if backup should be archived based on age."""
     return backup_date is not None and (datetime.utcnow() - backup_date).days >= threshold_days
 
-def move_blob(blob: storage.Blob, target_bucket: storage.Bucket, target_path: str, dry_run: bool) -> bool:
+def move_blob(blob: storage.Blob, target_bucket: storage.Bucket, target_path: str, dry_run: bool, server_name: str) -> bool:
     """Move blob to target bucket with verification."""
     source_md5 = blob.md5_hash
     if dry_run:
-        logging.info(f"[DRY-RUN] Would move: {blob.name} → {target_path}")
+        logging.info(f"[DRY-RUN] Would move: {blob.name} (server: {server_name}) → {target_path}")
         return True
 
     # Check if target exists
@@ -83,7 +99,7 @@ def move_blob(blob: storage.Blob, target_bucket: storage.Bucket, target_path: st
         return False
 
     blob.delete()
-    logging.info(f"MOVED: {blob.name} → {target_path}")
+    logging.info(f"MOVED: {blob.name} (server: {server_name}) → {target_path}")
     return True
 
 def process_backups_parallel(db_type: str, db_config: dict, 
@@ -108,6 +124,7 @@ def process_backups_parallel(db_type: str, db_config: dict,
                 logging.debug(f"Skipping (not old enough): {blob.name}")
                 continue
 
+            server_name = extract_server_name(blob.name, db_type)
             # Safe path replacement for compatibility
             if blob.name.startswith(db_config['source_path']):
                 target_path = db_config['target_path'] + blob.name[len(db_config['source_path']):]
@@ -115,7 +132,7 @@ def process_backups_parallel(db_type: str, db_config: dict,
                 target_path = db_config['target_path'] + blob.name
 
             futures.append(
-                executor.submit(move_blob, blob, target_bucket, target_path, dry_run)
+                executor.submit(move_blob, blob, target_bucket, target_path, dry_run, server_name)
             )
 
         for future in as_completed(futures):
