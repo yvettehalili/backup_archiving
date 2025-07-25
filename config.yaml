@@ -1,0 +1,20 @@
+service_account:
+  path: '/root/jsonfiles/ti-dba-prod-01.json'
+
+storage:
+  source_bucket: 'ti-dba-prod-sql-01'
+  target_bucket: 'ti-dba-prod-sql-02'
+  retention_days: 60
+
+paths:
+  log_dir: '/backup/logs'
+
+databases:
+  mysql:
+    source_path: 'Backups/Current/MYSQL'
+    target_path: 'Backups/Current/MYSQL'
+    file_extension: '.sql.gz'
+  postgresql:
+    source_path: 'Backups/Current/POSTGRESQL'
+    target_path: 'Backups/Current/POSTGRESQL'
+    file_extension: '.dump'
